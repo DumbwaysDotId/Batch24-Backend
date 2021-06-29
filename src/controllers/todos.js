@@ -1,57 +1,108 @@
-const todos = require("../data/dummyData");
+const pool = require("../data/database");
 
 exports.getTodos = async (req, res) => {
-  res.status(200).send({
-    status: "success",
-    message: "resource has successfully get",
-    data: todos,
-  });
-};
+  try {
+    const connection = await pool.getConnection();
+    let todos = await connection.query("SELECT * FROM todos");
 
-exports.postTodo = (req, res) => {
-  console.log(req.body);
-
-  todos.push({
-    id: 4,
-    ...req.body,
-  });
-  res.status(201).send({
-    status: "success",
-    message: "resource has successfully created",
-    data: todos,
-  });
-};
-
-exports.deleteTodo = (req, res) => {
-  const { id } = req.params;
-  console.log(typeof id);
-  const newTodos = todos.filter((todo) => todo.id !== parseInt(id));
-
-  res.send({
-    status: "success",
-    message: "resource has successfully delete",
-    data: newTodos,
-  });
-};
-
-exports.putTodo = (req, res) => {
-  const body = req.body;
-  console.log(body);
-  const { id } = req.params;
-  const newTodos = todos.map((todo) => {
-    if (todo.id == id) {
+    todos = todos[0].map((todo) => {
+      if (todo.isDone === 0) {
+        return {
+          ...todo,
+          isDone: false,
+        };
+      }
       return {
         ...todo,
-        ...body,
+        isDone: true,
       };
-    }
-    return todo;
-  });
-  res.send({
-    status: "success",
-    message: "resource has successfully get",
-    data: newTodos,
-  });
+    });
+    connection.release();
+    res.status(200).send({
+      status: "success",
+      message: "resource has successfully get",
+      data: todos,
+    });
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+exports.postTodo = async (req, res) => {
+  const { description, isDone } = req.body;
+  try {
+    const connection = await pool.getConnection();
+    const query = "INSERT INTO todos (description, isDone) VALUES (?,?)";
+    let todos = await connection.query(query, [description, isDone]);
+    todos = await connection.query("SELECT * FROM todos");
+
+    todos = todos[0].map((todo) => {
+      if (todo.isDone === 0) {
+        return {
+          ...todo,
+          isDone: false,
+        };
+      }
+      return {
+        ...todo,
+        isDone: true,
+      };
+    });
+    connection.release();
+    res.status(201).send({
+      status: "success",
+      message: "resource has successfully created",
+      data: todos,
+    });
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+exports.deleteTodo = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const connection = await pool.getConnection();
+    const todos = await connection.query("DELETE FROM todos WHERE id = ?", [
+      id,
+    ]);
+    connection.release();
+    res.send({
+      status: "success",
+      message: "resource has successfully delete",
+      data: todos[0],
+    });
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+exports.putTodo = async (req, res) => {
+  const body = req.body;
+  const { id } = req.params;
+  try {
+    const connection = await pool.getConnection();
+    await connection.query("UPDATE todos SET ? WHERE id = ?", [body, id]);
+    let todos = await connection.query(
+      "SELECT * FROM todos WHERE id = ? LIMIT 1",
+      [id]
+    );
+
+    todos = todos[0].map((todo) => {
+      if (todo.isDone === 0) {
+        return { ...todo, isDone: false };
+      }
+      return { ...todo, isDone: true };
+    });
+    connection.release();
+    res.send({
+      status: "success",
+      message: "resource has successfully get",
+      data: todos,
+    });
+  } catch (err) {
+    console.log(err);
+  }
 };
 
 exports.template = (req, res) => {
